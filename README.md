@@ -54,9 +54,9 @@ The application uses deterministic application logic for safety, routing, retrie
 
 ## Demo Video
 
-The following video demonstrates the Aster & Row Support Agent in action, including knowledge-base question answering, source citations, order lookup, multi-turn conversations, safety/refusal handling, conflict detection, and the deterministic evaluation suite.
+The following video demonstrates the Aster & Row Support Agent in action, including knowledge-base question answering, source citations, order lookup, multi-turn conversations, safety/refusal handling, conflict detection, and deterministic evaluation.
 
-https://github.com/user-attachments/assets/abc12345-....
+https://github.com/user-attachments/assets/62c3e4f4-b07b-4119-8e95-7324d62e369e
 
 ---
 
