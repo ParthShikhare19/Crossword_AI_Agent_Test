@@ -1,0 +1,34 @@
+ASTER & ROW SUPPORT AGENT
+DETERMINISTIC EVALUATION
+
+Passed: 22/23
+Failed: 1
+Overall: 95.65%
+
+CATEGORY RESULTS
+
+Groundedness: 4/4 (100.00%)
+Multi-turn: 2/2 (100.00%)
+Privacy / Safety: 3/3 (100.00%)
+Retrieval: 3/3 (100.00%)
+Tool Use: 10/11 (90.91%)
+
+FAILED CASES
+
+[FAIL] canada-multiturn (Tool Use)
+Question: Do you ship internationally?
+Answer: We currently ship internationally only to Canada. Shipping to any other country is not available at this time.  
+Source: 06-international-shipping.md - "Supported destinations"
+Intent: rag
+Handoff: False
+Sources: 06-international-shipping.md, 09-trailplus-membership.md, 05-domestic-shipping.md
+Question: What about Canada, and how long does it take?
+Answer: We do ship to Canada.  
+After your order is processed (usually 1-2 business days), the package is dispatched and typically arrives within **5-9 business days**.  Delivery can be extended by customs processing or carrier delays.  
+
+Source: 06-international‑shipping.md - "Supported destinations"  
+Source: 06-international‑shipping.md - "Canada delivery estimate" Import duties, taxes, and brokerage charges are not prepaid by Aster & Row; the recipient is responsible for charges assessed by Canadian authorities or the carrier.
+Intent: rag
+Handoff: False
+Sources: 06-international-shipping.md, 06-international-shipping.md, 06-international-shipping.md, 06-international-shipping.md, 05-domestic-shipping.md, 05-domestic-shipping.md
+Tool calls: None
