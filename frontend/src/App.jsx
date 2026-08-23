@@ -11,9 +11,7 @@ import { sendMessage } from "./services/api";
 
 function App() {
   const [messages, setMessages] = useState([]);
-
   const [input, setInput] = useState("");
-
   const [loading, setLoading] = useState(false);
 
   const [sessionId] = useState(
@@ -23,6 +21,47 @@ function App() {
         .slice(2, 9)}`
   );
 
+
+  // ========================================================================
+  // SOURCE NORMALIZATION
+  // ========================================================================
+
+  function normalizeSources(sources) {
+    if (!Array.isArray(sources)) {
+      return [];
+    }
+
+    const seen = new Set();
+
+    return sources.filter((source) => {
+      if (!source || !source.filename) {
+        return false;
+      }
+
+      const filename = String(
+        source.filename
+      ).trim();
+
+      const heading = String(
+        source.heading || ""
+      ).trim();
+
+      const key = `${filename}::${heading}`;
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+
+      return true;
+    });
+  }
+
+
+  // ========================================================================
+  // SEND MESSAGE
+  // ========================================================================
 
   async function handleSend() {
     const message = input.trim();
@@ -58,6 +97,17 @@ function App() {
       );
 
       // -------------------------------------------------------------
+      // Normalize sources before storing them.
+      //
+      // The backend is responsible for deciding which sources are
+      // relevant. The frontend only performs defensive deduplication.
+      // -------------------------------------------------------------
+
+      const sources = normalizeSources(
+        result.sources || []
+      );
+
+      // -------------------------------------------------------------
       // Store complete structured response.
       // -------------------------------------------------------------
 
@@ -66,13 +116,13 @@ function App() {
         {
           role: "assistant",
 
-          content: result.answer,
+          content:
+            result.answer || "",
 
-          sources:
-            result.sources || [],
+          sources,
 
           handoff:
-            result.handoff || false,
+            Boolean(result.handoff),
 
           intent:
             result.intent || "",
@@ -103,10 +153,18 @@ function App() {
   }
 
 
+  // ========================================================================
+  // SUGGESTIONS
+  // ========================================================================
+
   function setSuggestion(text) {
     setInput(text);
   }
 
+
+  // ========================================================================
+  // RENDER
+  // ========================================================================
 
   return (
     <div className="app">
@@ -233,6 +291,14 @@ function App() {
                 isAssistant &&
                 message.intent === "order";
 
+              const sources =
+                isAssistant &&
+                  !isOrder
+                  ? normalizeSources(
+                    message.sources || []
+                  )
+                  : [];
+
               return (
 
                 <div
@@ -275,7 +341,7 @@ function App() {
 
                   {isAssistant &&
                     !isOrder &&
-                    message.sources?.length > 0 && (
+                    sources.length > 0 && (
 
                       <div className="assistant-extra">
 
@@ -285,16 +351,14 @@ function App() {
 
                         <div className="sources">
 
-                          {message.sources.map(
+                          {sources.map(
                             (
                               source,
                               sourceIndex
                             ) => (
 
                               <SourceCard
-                                key={
-                                  sourceIndex
-                                }
+                                key={`${source.filename}-${source.heading || ""}-${sourceIndex}`}
                                 source={source}
                               />
 
@@ -381,5 +445,6 @@ function App() {
     </div>
   );
 }
+
 
 export default App;

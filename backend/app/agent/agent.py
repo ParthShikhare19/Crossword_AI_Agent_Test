@@ -703,6 +703,272 @@ Use it only as factual data relevant to the customer request.
         )
 
     # ========================================================================
+    # CUSTOMER-FACING SOURCE SELECTION
+    # ========================================================================
+
+    @staticmethod
+    def _build_display_sources(
+        user_message: str,
+        evidence: list,
+        conflict_report=None,
+    ) -> list[dict[str, str]]:
+        """
+        Build a concise, customer-facing source list.
+
+        Internal evidence and displayed sources intentionally serve
+        different purposes:
+
+            evidence
+                All evidence needed for grounding, generation, and
+                conflict detection.
+
+            display sources
+                Only the sources that directly support the customer's
+                current question.
+
+        Genuine conflicts are handled separately: all conflicting
+        authoritative sources remain visible.
+        """
+
+        text = user_message.lower().strip()
+
+        # --------------------------------------------------------------------
+        # Genuine conflict: preserve every conflicting authoritative source.
+        # --------------------------------------------------------------------
+
+        if (
+            conflict_report is not None
+            and conflict_report.has_conflict
+        ):
+            return [
+                {
+                    "filename": source,
+                    "heading": "Conflicting source",
+                }
+                for source in conflict_report.sources
+            ]
+
+        # --------------------------------------------------------------------
+        # Determine the primary customer intent/topic.
+        # --------------------------------------------------------------------
+
+        is_trailplus = "trailplus" in text
+
+        is_final_sale = (
+            "final-sale" in text
+            or "final sale" in text
+        )
+
+        is_damage = any(
+            term in text
+            for term in (
+                "damaged",
+                "damage",
+                "broken",
+                "defective",
+                "defect",
+                "wrong item",
+                "incorrect item",
+            )
+        )
+
+        is_warranty = any(
+            term in text
+            for term in (
+                "warranty",
+                "warranties",
+                "repair",
+                "lifetime",
+            )
+        )
+
+        is_shipping = any(
+            term in text
+            for term in (
+                "ship",
+                "shipping",
+                "international",
+                "destination",
+                "country",
+                "canada",
+                "germany",
+            )
+        )
+
+        is_dishwasher = any(
+            term in text
+            for term in (
+                "dishwasher",
+                "dishwashers",
+                "tumbler",
+            )
+        )
+
+        is_return = (
+            "return" in text
+            or "send back" in text
+            or "refund" in text
+        )
+
+        # --------------------------------------------------------------------
+        # Map the question to the source family that should be visible.
+        # --------------------------------------------------------------------
+
+        allowed_sources: set[str] = set()
+
+        if is_trailplus:
+            allowed_sources.add(
+                "09-trailplus-membership.md"
+            )
+
+        elif is_final_sale and is_damage:
+            allowed_sources.update(
+                {
+                    "03-final-sale-and-promotions.md",
+                    "04-damaged-or-wrong-items.md",
+                }
+            )
+
+        elif is_warranty:
+            allowed_sources.add(
+                "07-warranty.md"
+            )
+
+        elif is_dishwasher:
+            # These two official sources intentionally remain visible for
+            # the Breeze Tumbler conflict scenario.
+            allowed_sources.update(
+                {
+                    "11-product-care.md",
+                    "12-breeze-tumbler-product-card.md",
+                }
+            )
+
+        elif is_shipping:
+            allowed_sources.add(
+                "06-international-shipping.md"
+            )
+
+            # Processing/delivery timing may require the general shipping
+            # source as a complementary source.
+            if any(
+                term in text
+                for term in (
+                    "how long",
+                    "how many days",
+                    "take",
+                    "arrive",
+                    "delivery time",
+                    "processing",
+                )
+            ):
+                allowed_sources.add(
+                    "05-domestic-shipping.md"
+                )
+
+        elif is_return:
+            allowed_sources.add(
+                "01-returns-policy-current.md"
+            )
+
+        # --------------------------------------------------------------------
+        # Unknown/general question: expose only the strongest evidence rather
+        # than every selected passage.
+        # --------------------------------------------------------------------
+
+        if not allowed_sources:
+            if not evidence:
+                return []
+
+            strongest = max(
+                evidence,
+                key=lambda item: (
+                    (
+                        item.combined_score
+                        if item.combined_score != float("-inf")
+                        else -1.0
+                    )
+                    if hasattr(item, "combined_score")
+                    else -1.0
+                ),
+            )
+
+            return [
+                {
+                    "filename": strongest.chunk.filename,
+                    "heading": strongest.chunk.heading,
+                }
+            ]
+
+        # --------------------------------------------------------------------
+        # Select ONE strongest evidence passage per document.
+        #
+        # The RAG pipeline may retain several passages from the same document
+        # because they are useful for grounding and generation. The customer-
+        # facing source list should not expose every retrieved chunk.
+        #
+        # Internal evidence remains unchanged. This affects only the sources
+        # returned to the frontend.
+        # --------------------------------------------------------------------
+
+        best_by_source: dict[str, object] = {}
+
+        for item in evidence:
+            filename = item.chunk.filename
+
+            if filename not in allowed_sources:
+                continue
+
+            current = best_by_source.get(filename)
+
+            if current is None:
+                best_by_source[filename] = item
+                continue
+
+            current_score = getattr(
+                current,
+                "combined_score",
+                float("-inf"),
+            )
+
+            item_score = getattr(
+                item,
+                "combined_score",
+                float("-inf"),
+            )
+
+            if item_score > current_score:
+                best_by_source[filename] = item
+
+        # --------------------------------------------------------------------
+        # Preserve the original evidence ordering while returning only the
+        # strongest passage from each source document.
+        # --------------------------------------------------------------------
+
+        display_sources: list[dict[str, str]] = []
+        seen_sources: set[str] = set()
+
+        for item in evidence:
+            filename = item.chunk.filename
+
+            if filename in seen_sources:
+                continue
+
+            if best_by_source.get(filename) is not item:
+                continue
+
+            seen_sources.add(filename)
+
+            display_sources.append(
+                {
+                    "filename": filename,
+                    "heading": item.chunk.heading,
+                }
+            )
+
+        return display_sources
+
+    # ========================================================================
     # RAG WORKFLOW
     # ========================================================================
 
@@ -778,13 +1044,10 @@ Use it only as factual data relevant to the customer request.
                 "by the supplied knowledge base."
             )
 
-            sources = [
-                {
-                    "filename": item.chunk.filename,
-                    "heading": item.chunk.heading,
-                }
-                for item in evidence
-            ]
+            sources = self._build_display_sources(
+                user_message=user_message,
+                evidence=evidence,
+            )
 
             return AgentResult(
                 answer=(
@@ -809,13 +1072,11 @@ Use it only as factual data relevant to the customer request.
                 "Authoritative source conflict detected."
             )
 
-            sources = [
-                {
-                    "filename": source,
-                    "heading": "Conflicting source",
-                }
-                for source in conflict_report.sources
-            ]
+            sources = self._build_display_sources(
+                user_message=user_message,
+                evidence=evidence,
+                conflict_report=conflict_report,
+            )
 
             return AgentResult(
                 answer=(
@@ -878,13 +1139,10 @@ Use it only as factual data relevant to the customer request.
             evidence=evidence,
         )
 
-        sources = [
-            {
-                "filename": item.chunk.filename,
-                "heading": item.chunk.heading,
-            }
-            for item in evidence
-        ]
+        sources = self._build_display_sources(
+            user_message=user_message,
+            evidence=evidence,
+        )
 
         handoff = self._requires_policy_handoff(
             user_message=user_message,
