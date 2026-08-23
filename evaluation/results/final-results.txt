@@ -24,7 +24,7 @@ Handoff: False
 Sources: 06-international-shipping.md
 Question: What about Canada, and how long does it take?
 Answer: We do ship to Canada.  
-Canadian orders are processed in 1-2 business days before they are dispatched, and then generally arrive within 5-9 business days after dispatch.  Delivery times can be extended by customs processing or carrier delays.  
+After your order is processed (usually 1-2 business days), the package is dispatched and typically arrives within **5-9 business days**.  Delivery can be extended by customs processing or carrier delays.  
 
 Source: 06-international‑shipping.md - "Supported destinations"  
 Source: 06-international‑shipping.md - "Canada delivery estimate" Import duties, taxes, and brokerage charges are not prepaid by Aster & Row; the recipient is responsible for charges assessed by Canadian authorities or the carrier.
